@@ -2,7 +2,7 @@
 % Please edit documentation in R/simulation_functions.R
 \name{simulation_scenario_one}
 \alias{simulation_scenario_one}
-\title{Simulate Data for Scenario One (Scale-Invariant Tail)}
+\title{Simulate Data for Scenario One (Scale-Invariant Tail -- second version)}
 \usage{
 simulation_scenario_one(
   n = 5000,

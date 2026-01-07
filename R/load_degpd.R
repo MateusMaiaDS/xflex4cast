@@ -12,6 +12,12 @@ NULL
 #' It is designed to be used during package development or advanced workflows where
 #' direct loading of source files is needed.
 #'
+#' @param dest_r Path to the directory containing the R source files.
+#'   If `NULL`, defaults to `"inst/degpd-and-zidegpd/R/"`.
+#'
+#' @param dest_src Path to the directory containing the C++ source files.
+#'   If `NULL`, defaults to `"inst/degpd-and-zidegpd/src/"`.
+#'   
 #' @details
 #' The function assumes the existence of two subdirectories within the `inst/degpd-and-zidegpd/` path:
 #' - `R/`: containing R source files to be loaded via `source()`.
@@ -39,20 +45,42 @@ NULL
 #' }
 #' @export
 #'
-load_degpd <- function(){
-  # Loading all files for the DEGPD fit
-  dest <- "inst/degpd-and-zidegpd/R/"      # this function all R function
-  files = list.files(dest, full.names = T)
-  for (i in 1:length(files)) {
-    source(files[i])
-  }
-
-  dest <- "inst/degpd-and-zidegpd/src/"  # This function will call all C++ files
-  files = list.files(dest, full.names = T)
-  try({
-    for (i in 1:length(files)) {
-      Rcpp::sourceCpp(files[i])
-    }
-  })
-  return(invisible(NULL))
+load_degpd <- function(dest_r = NULL,
+                       dest_src = NULL){
+     
+     
+     # Loading all files for the DEGPD fit
+     if(is.null(dest_r)){
+          dest_r <- "inst/degpd-and-zidegpd/R/"      # this function all R function
+     }  else {
+     
+          if(!dir.exists(dest_r)){
+                    stop("Inset a valid path for dest_r.")
+          }
+     }
+     
+     # Loading all files for the DEGPD fit
+     if(is.null(dest_src)){
+          dest_r <- "inst/degpd-and-zidegpd/src/"      # this function all R function
+     }  else {
+          
+          if(!dir.exists(dest_src)){
+               stop("Inset a valid path for dest_src.")
+          }
+     }
+     
+     
+     files = list.files(dest_r, full.names = T)
+     for (i in 1:length(files)) {
+     source(files[i])
+     }
+     
+     dest <- "inst/degpd-and-zidegpd/src/"  # This function will call all C++ files
+     files = list.files(dest_src, full.names = T)
+     try({
+          for (i in 1:length(files)) {
+           Rcpp::sourceCpp(files[i])
+          }
+     })
+     return(invisible(NULL))
 }

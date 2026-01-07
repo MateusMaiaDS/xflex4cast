@@ -340,7 +340,32 @@ sim_dgp <- function(n = 100,
 }
 
 
-#' Simulate Data for Scenario One (Scale-Invariant Tail)
+qdgamma <- function(p, shape, scale, Kmax = 5000) {
+     
+     # Safety
+     if(any(p < 0 | p > 1)) stop("All probabilities p must be between 0 and 1.")
+     
+     # Create support 0,1,2,...,Kmax
+     k <- 0:Kmax
+     
+     # Discrete gamma CDF: F_dg(k) = F_gamma(k+1)
+     cdf_vals <- pgamma(k + 1, shape = shape, scale = scale)
+     
+     # For each p, find the first k such that CDF >= p
+     q <- sapply(p, function(pp) {
+          idx <- which(cdf_vals >= pp)[1]
+          if (is.na(idx)) return(NA)   # Probabilities too extreme for the grid
+          return(k[idx])
+     })
+     
+     return(q)
+}
+
+
+
+
+
+#' Simulate Data for Scenario One (Scale-Invariant Tail -- second version)
 #'
 #' Generates synthetic count data where the bulk is modeled by a discrete gamma distribution
 #' and the tail by a discrete generalized Pareto (DGP) with constant scale.
@@ -366,80 +391,101 @@ sim_dgp <- function(n = 100,
 #'
 #' @export
 simulation_scenario_one <- function(n = 5000,
-                         phi = 0.1,
-                         xi = 0.3,
-                         scale_dgp = 2.5,
-                         shape_dgamma = 1.5,
-                         weibull_shape = 2.76,
-                         weibull_scale = 5.90,
-                         beta_scale_dgamma = c(1,1),
-                         probs = c(0.001,0.01,0.05,0.25,0.5,0.75,0.8,0.9,0.95,0.99,0.999,0.9999),
-                         index = NULL){
-
-  scale_to_range <- function(x, a, b) {
-    (x - min(x)) / (max(x) - min(x)) * (b - a) + a
-  }
-
-  sim_data <- x1_x2_df_simulation
-  sim_data_sample <- sample(1:nrow(sim_data), size = n, replace = TRUE)
-  x1 <- scale_to_range(sim_data$x1[sim_data_sample], a = -0.5, b = 5/3)
-  x2 <- sim_data$x2[sim_data_sample]
-
-  x <- data.table::data.table(x1 = x1, x2 = x2)
-  x <- cbind(1, x)
-  betas_scale_dgamma <- c(1, 2, 0)
-  scale_parameter_dgamma <- exp(tcrossprod(as.matrix(x), matrix(betas_scale_dgamma, nrow = 1)))
-
-  sample <- extraDistr::rdgamma(n = n, shape = shape_dgamma, scale = scale_parameter_dgamma)
-
-  dgamma_cdf <- do.call(rbind, lapply(scale_parameter_dgamma, function(x) {
-    extraDistr::pdgamma(q = 0:1000, shape = shape_dgamma, scale = x)
-  }))
-  dgamma_pmf <- do.call(rbind, lapply(scale_parameter_dgamma, function(x) {
-    extraDistr::ddgamma(x = 0:1000, shape = shape_dgamma, scale = x)
-  }))
-
-  index_quantile <- apply(dgamma_cdf, 1, function(y) {
-    which.min(abs(y[(y - (1 - phi)) < 0] - (1 - phi)))
-  })
-
-  update_phi <- numeric()
-  for (i in 1:nrow(dgamma_cdf)) {
-    update_phi[i] <- 1 - dgamma_cdf[i, index_quantile[[i]]]
-  }
-
-  xx_max <- ncol(dgamma_cdf) - 1
-  cdf_dggp <- pmf_dggp <- matrix(0, nrow = nrow(x), ncol = ncol(dgamma_cdf))
-  colnames(cdf_dggp) <- colnames(pmf_dggp) <- as.character(0:xx_max)
-  true_quantiles <- matrix(0, nrow = nrow(x), ncol = length(probs))
-  y <- numeric(nrow(x))
-
-  for (j in 1:nrow(x)) {
-    pmf_dggp[j, 1:(index_quantile[j])] <- dgamma_pmf[j, 1:(index_quantile[j])]
-    if (index_quantile[j] < (xx_max + 1)) {
-      pmf_dggp[j, (index_quantile[j] + 1):(xx_max + 1)] <- update_phi[j] * ddgp(x = 0:(xx_max - index_quantile[j]), shape = xi, scale = scale_dgp)
-    } else {
-      pmf_dggp[j, index_quantile[j]] <- update_phi[j] * ddgp(x = 0, shape = xi, scale = scale_dgp[j])
-    }
-    cdf_dggp[j, ] <- cumsum(pmf_dggp[j, ])
-    true_quantiles[j, ] <- sapply(probs, function(p) which((cdf_dggp[j, ] - p) > 0)[1] - 2)
-    y[j] <- sample(x = 0:xx_max, size = 1, prob = pmf_dggp[j, ], replace = TRUE)
-  }
-
-  true_quantiles <- ifelse(true_quantiles < 0, 0, true_quantiles)
-  colnames(true_quantiles) <- probs
-
-
-  true_quantiles <- ifelse(true_quantiles < 0, 0, true_quantiles)
-  colnames(true_quantiles) <- probs
-
-  list(
-    data = data.table::data.table(fit_data_row = 1:n, x1 = x$x1, x2 = x$x2, y = y),
-    pmf_dggp = pmf_dggp,
-    true_quantiles = true_quantiles
-  )
+                                    phi = 0.1,
+                                    xi = 0.3,
+                                    scale_dgp = 2.5,
+                                    shape_dgamma = 1.5,
+                                    weibull_shape = 2.76,
+                                    weibull_scale = 5.90,
+                                    beta_scale_dgamma = c(1,1),
+                                    probs = c(0.001,0.01,0.05,0.25,0.5,0.75,0.8,0.9,0.95,0.99,0.999,0.9999),
+                                    index = NULL){
+     
+     scale_to_range <- function(x, a, b) {
+          (x - min(x)) / (max(x) - min(x)) * (b - a) + a
+     }
+     
+     sim_data <- x1_x2_df_simulation
+     sim_data_sample <- sample(1:nrow(sim_data), size = n, replace = TRUE)
+     x1 <- scale_to_range(sim_data$x1[sim_data_sample], a = -0.5, b = 5/3)
+     x2 <- sim_data$x2[sim_data_sample]
+     
+     x <- data.table::data.table(x1 = x1, x2 = x2)
+     x <- cbind(1, x)
+     betas_scale_dgamma <- c(1, 2, 0)
+     scale_parameter_dgamma <- exp(tcrossprod(as.matrix(x), matrix(betas_scale_dgamma, nrow = 1)))
+     
+     sample <- extraDistr::rdgamma(n = n, shape = shape_dgamma, scale = scale_parameter_dgamma)
+     
+     dgamma_cdf <- do.call(rbind, lapply(scale_parameter_dgamma, function(x) {
+          extraDistr::pdgamma(q = 0:1000, shape = shape_dgamma, scale = x)
+     }))
+     dgamma_pmf <- do.call(rbind, lapply(scale_parameter_dgamma, function(x) {
+          extraDistr::ddgamma(x = 0:1000, shape = shape_dgamma, scale = x)
+     }))
+     
+     ## Quantile threshold that should be the same as the id
+     quantile_threshold_idx <- apply(dgamma_cdf,1,function(x)which(x>=(1-phi))[1]) - 1 ## We are not including the quantile member in the SUPPORT for the discrete gamma, be aware of the lower than !
+     
+     ## True quantile ( pay attention here, when I mentioning the true quantile it refers to the last element that belongs to the support of the discrete gamma)
+     # to get the threshold for model the exceedances we need to compute u = true_quantile + 1
+     true_quantile <- quantile_threshold_idx-1
+     
+     # Here I looking for the probability for the last 'k' element which is described by the discrete gamma. which is equal to q_Y_{dg}-1.
+     # The quantile_threshold_idx the zero is indexed by one so by checking the quantile_threshold_idx we are actually the one before the threshold
+     update_phi <- numeric()
+     for (i in 1:nrow(dgamma_cdf)) {
+          update_phi[i] <- 1 - dgamma_cdf[i, quantile_threshold_idx[[i]]] ## Doesn't account for zero.
+     }
+     
+     xx_max <- 10000 
+     
+     cdf_dggp <- pmf_dggp <- matrix(NA, nrow = nrow(x), ncol = xx_max+1)
+     colnames(cdf_dggp) <- colnames(pmf_dggp) <- as.character(0:xx_max)
+     true_quantiles <- matrix(NA, nrow = nrow(x), ncol = length(probs))
+     colnames(true_quantiles) <- as.character(probs)
+     y <- numeric(nrow(x))
+     
+     pmf_row <- numeric(xx_max + 1)
+     complete_ddgp <- ddgp(x = 0:xx_max,shape = xi,scale = scale_dgp)
+     
+     for (j in 1:nrow(x)) {
+          
+          # lower part
+          if (quantile_threshold_idx[j] > 0) {
+               pmf_row[1:quantile_threshold_idx[j]] <-
+                    dgamma_pmf[j, 1:quantile_threshold_idx[j]]
+          }
+          
+          # upper part
+          if ((quantile_threshold_idx[j] + 1) <= (xx_max + 1)) {
+               L <- xx_max - quantile_threshold_idx[j] + 1
+               pmf_row[(quantile_threshold_idx[j] + 1):(xx_max + 1)] <-
+                    update_phi[j] * complete_ddgp[1:L]
+          } else {
+               # edge case: only one element in tail
+               pmf_row[quantile_threshold_idx[j] + 1] <-
+                    update_phi[j] * ddgp(0, shape = xi, scale = scale_dgp)
+          }
+          
+          #  --- Compute CDF just once ----
+          cdf_row <- cumsum(pmf_row)
+          if((max(cdf_row)-1) > 1e-5){
+               warning("The CDF for the mixture is not correctly defined as the maximum is not one.")
+          }
+          # findInterval use binary search rather than y
+          true_quantiles[j, ] <- findInterval(probs, cdf_row)
+          
+          # sample.int is faster for this as well
+          y[j] <- sample.int(xx_max + 1, size = 1, prob = pmf_row)
+     }
+     
+     list(
+          data = data.table::data.table(fit_data_row = 1:n, x1 = x$x1, x2 = x$x2, y = y, true_u = true_quantile+1),
+          pmf_dggp = pmf_dggp,
+          true_quantiles = true_quantiles
+     )
 }
-
 
 #' Simulate Data for Scenario Two (Non-Stationary Tail)
 #'

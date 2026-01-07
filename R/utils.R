@@ -30,3 +30,25 @@ sr_progress_bar <- function(current, total, bar_length = 50) {
   flush.console()
 }
 
+#' Convert prediction table into day-by-quantile matrix
+#'
+#' @param dt A data.table with columns: quantile, valid_time, value
+#' @return A numeric matrix with rows = valid_time and columns = quantile
+quantile_matrix <- function(dt) {
+
+  x <- copy(dt)
+
+  # Cast with rows = valid_time and columns = quantile
+  wide <- dcast(
+    x,
+    valid_time ~ quantile,
+    value.var = "value"
+  )
+
+  # Extract matrix
+  vt <- wide$valid_time
+  M <- as.matrix(wide[, -1])
+  rownames(M) <- as.character(vt)
+
+  return(M)
+}

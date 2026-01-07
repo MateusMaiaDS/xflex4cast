@@ -1,6 +1,8 @@
 #' @importFrom data.table data.table :=
 #' @importFrom stats predict quantile sigma
 #' @importFrom utils data flush.console
+#' @useDynLib xflex4cast, .registration = TRUE
+#' @importFrom Rcpp evalCpp
 NULL
 
 #' @title Define xflex4cast Model Parameters
@@ -55,6 +57,8 @@ define_xflex4cast <- function(mqgam_formula,
 #' @param model A `xflex4cast` object.
 #' @param data A `data.frame` or `data.table` with the training data.
 #' @param index Column name for unique identifier used in cross-validation. If `NULL`, uses row numbers.
+#' @param fit_tail_only boolean. If `TRUE` it will use the currently fitted `mqgam_fit` model object from the
+#' `xflex4cast` object and fit only the tail.
 #'
 #' @return A fitted `xflex4cast` object.
 #'
@@ -62,8 +66,21 @@ define_xflex4cast <- function(mqgam_formula,
 
 fit.xflex4cast <- function(model,
                            data,
-                           index = NULL) {
+                           index = NULL,
+                           fit_tail_only = FALSE) {
 
+  # Checking if the model has the `mqgam` model object if fit_tail_only=TRUE
+  if(fit_tail_only){
+
+       if(!inherits(model$mqgam_fit,"mqgam")){
+          stop("xflex4cast must have a valid mqgam_fit object to set 'fit_tail_only' as TRUE.")
+       }
+
+       if(!round(as.numeric(xflex4cast_fit$quantile_threshold),digits = 3) %in% round(as.numeric(names(xflex4cast_fit$mqgam_fit$fit)),digits = 3)){
+            stop("xflex4cast_fit$mqgam_fit does not contain the xflex4cast_fit$quantile_threshold.")
+       }
+
+  }
 
   # Add training data with index
   if( is.null(index) ) {
@@ -97,11 +114,12 @@ fit.xflex4cast <- function(model,
   model$data <- data.table::as.data.table(stats::get_all_vars(formula_mqgam_tail,data))
 
 
+  if(isFALSE(fit_tail_only)){
+       model$mqgam_fit <- qgam::mqgam(model$mqgam_formula,
+                                      data = data, qu = model$mqgam_quantiles,
+                                      control = list(verbose = FALSE, progress = FALSE))
 
-  model$mqgam_fit <- qgam::mqgam(model$mqgam_formula,
-                                 data = data, qu = model$mqgam_quantiles,
-                                 control = list(verbose = FALSE, progress = FALSE))
-
+  }
 
   if(model$fit_tail){
     # Getting exceed data

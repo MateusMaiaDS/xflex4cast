@@ -4,7 +4,14 @@
 \alias{load_degpd}
 \title{Load DEGPD and ZIDEGPD R and C++ Functions}
 \usage{
-load_degpd()
+load_degpd(dest_r = NULL, dest_src = NULL)
+}
+\arguments{
+\item{dest_r}{Path to the directory containing the R source files.
+If \code{NULL}, defaults to \code{"inst/degpd-and-zidegpd/R/"}.}
+
+\item{dest_src}{Path to the directory containing the C++ source files.
+If \code{NULL}, defaults to \code{"inst/degpd-and-zidegpd/src/"}.}
 }
 \value{
 Invisibly returns \code{NULL}. Used for its side effects.
