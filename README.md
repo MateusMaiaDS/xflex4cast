@@ -1,6 +1,6 @@
 xflex4cast Package: Simulation and Model Fitting Examples
 ================
-[![DOI](https://zenodo.org/badge/1029587988.svg)](https://doi.org/10.5281/zenodo.16646225)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19050172.svg)](https://doi.org/10.5281/zenodo.19050172)
 
 # Install and load `xflex4cast`:
 
